@@ -18,7 +18,7 @@ Para que todo o ecossistema funcione (especialmente os alertas diários e os gr�
 ---
 
 ## 📂 Estrutura do Repositório
-
+```
 ├── README.md
 ├── scripts/
 │   ├── update_apnic_cache.sh   # Download e renovação do cache local do APNIC (3.5MB)
@@ -30,6 +30,7 @@ Para que todo o ecossistema funcione (especialmente os alertas diários e os gr�
 │   └── ASN-IPV6MON.yaml        # Template pronto para importação no Zabbix 7.4+
 └── grafana/
     └── dashboard_apnic.json    # Código JSON declarativo do painel para o Grafana v13+
+```
 
 ---
 
@@ -38,15 +39,18 @@ Para que todo o ecossistema funcione (especialmente os alertas diários e os gr�
 ### Passo 1: Instalar dependências do sistema e do Python
 Certifique-se de instalar os pacotes globais do Linux. Caso use ambientes virtuais (`venv`), lembre-se de instalar a biblioteca `requests` dentro dele:
 
+``
 sudo apt update
 sudo apt install curl whois python3-requests -y
+``
 
 # Se utilizar ambiente virtual do Python, execute:
+``
 pip install requests
-
+``
 ### Passo 2: Organizar os scripts e aplicar permissions
 O script `ipv6.py` precisa ficar na pasta de checagens externas do Zabbix Server. Os demais podem ficar em uma pasta de sua preferência (ex: `/home/usuario/ASN-IPV6MON/scripts/`).
-
+```
 chmod +x scripts/update_apnic_cache.sh
 chmod +x scripts/notificar_ipv6.py
 chmod +x extra/get_groups.py
@@ -54,22 +58,15 @@ chmod +x extra/get_groups.py
 sudo cp scripts/ipv6.py /usr/lib/zabbix/externalscripts/
 sudo chmod +x /usr/lib/zabbix/externalscripts/ipv6.py
 sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/ipv6.py
-
+```
 
 ### Passo 3: Configurar a Automação do Agendamento (Cron)
 Configure o agendamento de acordo com o seu interpretador de Cron:
-
-#### Opção A: Se usar o Cron Nativo do Linux (crontab -e)
 O padrão do Linux utiliza 5 campos de tempo (Minuto Hora Dia Mês Semana):
-
-15 03 * * * /usr/lib/zabbix/externalscripts/update_apnic_cache.sh 52913
+``
+15 03 * * * /usr/lib/zabbix/externalscripts/update_apnic_cache.sh SENASN
 30 03 * * * /usr/bin/python3 /path-to-script/notificar_ipv6.py
-
-#### Opção B: Se o seu ambiente utiliza o formato de 6 campos (Segundos Minutos Horas Dia Mês Semana)
-
-15 30 03 * * * /usr/lib/zabbix/externalscripts/update_apnic_cache.sh SEUASN
-17 0 8 * * * /usr/bin/python3 /path-to-script/notificar_ipv6.py
-
+``
 💡 Nota sobre permissões: O script gerencia de forma transparente as permissões do cache gravado em /tmp (0o666), assegurando que tanto o usuário zabbix quanto o usuário local do cron leiam e escrevam nos arquivos sem travar por falta de privilégio.
 
 ---
@@ -106,11 +103,12 @@ O Zabbix passará a coletar automaticamente de forma modular:
 
 Abra o arquivo scripts/notificar_ipv6.py e insira as chaves de acesso correspondentes à sua sessão do WPPConnect-Server:
 
+```
 WPP_URL = "http://127.0.0.1:21465/api/SUA_SESSAO/send-mentioned"
 TOKEN = "SEU_TOKEN_AQUI"
 TARGET_GROUP = "ID_DO_GRUPO@g.us"
 NUMEROS_PARA_MENCIONAR = ["558187654321"]
-
+```
 💡 Nota técnica: O script de envio faz o uso correto do parâmetro mentioned nativo da API para que os administradores listados recebam o ping sonoro do alerta no grupo.
 
 ---
@@ -118,13 +116,13 @@ NUMEROS_PARA_MENCIONAR = ["558187654321"]
 ## 🔍 5. Como descobrir o ID (JID) do seu Grupo do WhatsApp
 
 Se você não souber o identificador único (@g.us) do grupo onde deseja receber os alertas diários, configure os parâmetros no arquivo extra/get_groups.py e execute:
-
+``
 python3 extra/get_groups.py
-
+``
 O script vai retornar uma tabela limpa no terminal estruturada desta forma:
 
 NOME DO GRUPO                       | ID (JID)
 ---------------------------------------------------------------------------
-Grupo de Alertas - Provedor         | 120363318283910283@g.us
+Grupo de Alertas - Provedor         | 120363318283910280@g.us
 
 ---
