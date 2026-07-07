@@ -1,0 +1,17 @@
+{
+  "annotations": [
+    {
+      "kind": "AnnotationQuery",
+      "spec": {
+        "builtIn": true,
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+…        "name": "VISIBLE_NAME",
+        "query": "IPV6MON-52913",
+        "skipUrlSync": false
+      }
+    }
+  ]
+}

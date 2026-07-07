@@ -1,0 +1,5 @@
+# Bloquear históricos e caches locais
+scripts/historico_ipv6_*.json
+/tmp/apnic_*.json
+/tmp/meu_asn_ipv6.cache
+/tmp/apnic_raw.txt
