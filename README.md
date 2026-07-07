@@ -63,10 +63,10 @@ sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/ipv6.py
 ### Passo 3: Configurar a Automação do Agendamento (Cron)
 Configure o agendamento de acordo com o seu interpretador de Cron:
 O padrão do Linux utiliza 5 campos de tempo (Minuto Hora Dia Mês Semana):
-``
+```
 15 03 * * * /usr/lib/zabbix/externalscripts/update_apnic_cache.sh SENASN
 30 03 * * * /usr/bin/python3 /path-to-script/notificar_ipv6.py
-``
+```
 💡 Nota sobre permissões: O script gerencia de forma transparente as permissões do cache gravado em /tmp (0o666), assegurando que tanto o usuário zabbix quanto o usuário local do cron leiam e escrevam nos arquivos sem travar por falta de privilégio.
 
 ---
