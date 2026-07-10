@@ -22,14 +22,6 @@ TOKEN = "SEU_TOKEN_AQUI"
 TARGET_GROUP = "ID_DO_GRUPO@g.us"
 NUMEROS_PARA_MENCIONAR = ["558187654321"]
 ```
-# Resolve conflito de permissão no /tmp mapeando o histórico pelo ID do usuário Linux atual (UID)
-try:
-    user_uid = os.getuid()
-except AttributeError:
-    user_uid = "default"
-
-HISTORICO_FILE = f"/tmp/historico_ipv6_{ASN}_{user_uid}.json"
-
 def get_status_emoji(hoje, ontem):
     if hoje > ontem:
         return "📈 *Subiu*"
@@ -39,7 +31,24 @@ def get_status_emoji(hoje, ontem):
         return "↔️ *Manteve*"
 
 def main():
-    # 1. EXECUTA O SCRIPT SH E CAPTURA O JSON DO MODO "ALL" EM TEMPO REAL
+    # 1. VALIDAÇÃO DO ARGUMENTO ASN NO TERMINAL
+    if len(sys.argv) < 2:
+        print("❌ Erro: O número do ASN é obrigatório como argumento!")
+        print("Uso correto: python3 notificar_ipv6.py <ASN>")
+        print("Exemplo:     python3 notificar_ipv6.py 52913")
+        sys.exit(1)
+
+    ASN = sys.argv[1].strip()
+
+    # Resolve conflito de permissão no /tmp mapeando o histórico pelo ID do usuário Linux atual (UID)
+    try:
+        user_uid = os.getuid()
+    except AttributeError:
+        user_uid = "default"
+
+    HISTORICO_FILE = f"/tmp/historico_ipv6_{ASN}_{user_uid}.json"
+
+    # 2. EXECUTA O SCRIPT SH E CAPTURA O JSON DO MODO "ALL" EM TEMPO REAL
     try:
         resultado = subprocess.run(
             [SCRIPT_PATH, ASN, "all"], 
@@ -49,7 +58,7 @@ def main():
         )
         dados_atuais = json.loads(resultado.stdout.strip())
     except Exception as e:
-        print(f"❌ Erro ao executar o script bash em {SCRIPT_PATH}: {e}")
+        print(f"❌ Erro ao executar o script bash em {SCRIPT_PATH} para o ASN {ASN}: {e}")
         sys.exit(1)
 
     # Coleta as variáveis extraídas do bash
@@ -57,7 +66,7 @@ def main():
     cap_hoje = round(float(dados_atuais.get("capable", 0)), 2)
     pref_hoje = round(float(dados_atuais.get("preferred", 0)), 2)
 
-    # 2. LEITURA DO HISTÓRICO REAL COM FALLBACK SEGURO PARA O PROPRIO DIA
+    # 3. LEITURA DO HISTÓRICO REAL COM FALLBACK SEGURO PARA O PROPRIO DIA
     if os.path.exists(HISTORICO_FILE):
         try:
             with open(HISTORICO_FILE, 'r', encoding='utf-8') as f:
@@ -73,7 +82,7 @@ def main():
     status_cap = get_status_emoji(cap_hoje, cap_ontem)
     status_pref = get_status_emoji(pref_hoje, pref_ontem)
 
-    # 3. FORMATAÇÃO DA MENSAGEM DO RELATÓRIO DO WHATSAPP
+    # 4. FORMATAÇÃO DA MENSAGEM DO RELATÓRIO DO WHATSAPP
     mensagem = (
         f"📊 *RELATÓRIO DIÁRIO IPv6 - AS{ASN}*\n"
         f"🏢 *Provedor:* {asname}\n\n"
@@ -84,7 +93,7 @@ def main():
         f"🕒 _Dados atualizados em tempo real via APNIC Labs_"
     )
 
-    # 4. TRATAMENTO DINÂMICO DE MENÇÕES (Evita erros se a lista estiver vazia)
+    # 5. TRATAMENTO DINÂMICO DE MENÇÕES (Evita erros se a lista estiver vazia)
     payload = {
         "phone": TARGET_GROUP,
         "isGroup": True
@@ -111,7 +120,7 @@ def main():
         response = requests.post(WPP_URL, json=payload, headers=headers, timeout=15)
         
         if response.status_code in [200, 201]:
-            print(f"✅ Relatório enviado com sucesso para o grupo {TARGET_GROUP}")
+            print(f"✅ Relatório do ASN {ASN} enviado com sucesso para o grupo {TARGET_GROUP}")
             
             # Salva os dados atuais reais que virarão o histórico oficial de amanhã
             with open(HISTORICO_FILE, 'w', encoding='utf-8') as f:

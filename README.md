@@ -1,3 +1,5 @@
+░▒▓    ~  nano cat                                                                                                     ✔  with joca@grafana  at 12:26:47  ▓▒░
+░▒▓    ~  cat README.md                                                                                                ✔  with joca@grafana  at 12:26:51  ▓▒░
 # ASN-IPV6MON V2 📊🌐
 Este projeto automatiza a coleta, o monitoramento temporal e a notificação de métricas de transição IPv6 (Capacidade e Preferência) para Sistemas Autônomos (ASN), utilizando dados oficiais consolidados em tempo real do **APNIC Labs**.
 
@@ -10,7 +12,7 @@ A solução conta com monitoramento nativo via **Zabbix (External Check)** usand
 Para que todo o ecossistema funcione (especialmente os alertas diários e os gráficos), a sua infraestrutura precisa contar com:
 
 1. **WPPConnect-Server Ativo:** É obrigatório ter o servidor do WPPConnect rodando (localmente ou em VPS) para intermediar o envio das mensagens e marcações no WhatsApp.
-   * 🔗 **Repositório Oficial:** [https://github.com/wppconnect-team/wppconnect-server](https://github.com/wppconnect-team/wppconnect-server)
+   * 🔗 **Repositório Oficial:** https://github.com/wppconnect-team/wppconnect-server
 2. **Sessão Iniciada:** Uma sessão válida e conectada via QR Code no WPPConnect-Server para disparar os alertas.
 3. **Zabbix Server 7.0+** com o plugin `alexanderzobnin-zabbix-datasource` ativo e configurado no Grafana.
 
@@ -58,12 +60,13 @@ sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/ipv6.sh
 ```
 
 ### Passo 3: Configurar a Automação do Agendamento (Cron)
+Como o script aceita o ASN de forma dinâmica por argumento, você deve passar o número do seu ASN desejado no final da chamada de execução:
 
 ```bash
-30 08 * * * /usr/bin/python3 /path-to-script/notificar_ipv6.py
+30 08 * * * /usr/bin/python3 /path-to-script/notificar_ipv6.py 52913
 ```
 
-💡 *Nota sobre permissões:* O histórico de comparação de variação é salvo automaticamente na pasta `/tmp` com permissão liberada (`0o666`), garantindo que tanto o usuário `zabbix` quanto o usuário do `cron` possam ler e gravar dados sem conflitos de privilégio (`Permission denied`).
+💡 *Nota sobre permissões:* O histórico de comparação de variação é salvo automaticamente na pasta `/tmp` com o sufixo do ID do usuário do Linux que o executou (`/tmp/historico_ipv6_{ASN}_{UID}.json`) com permissão liberada (`0o666`), garantindo que tanto o usuário `zabbix` quanto o usuário do `cron` possam ler e gravar dados sem conflitos de privilégio (`Permission denied`).
 
 ---
 
@@ -118,10 +121,11 @@ Abra o arquivo `scripts/notificar_ipv6.py` e configure os parâmetros de produç
 # Configurações da API WhatsApp (Seus dados reais de Produção)
 WPP_URL = "http://127.0.0.1:21465/api/SUA_SESSAO/send-mentioned"
 TOKEN = "SEU_TOKEN_AQUI"
+
+# Configurações de Destino no Grupo
 TARGET_GROUP = "ID_DO_GRUPO@g.us"
 NUMEROS_PARA_MENCIONAR = ["558187654321"]
 ```
-
 💡 *Nota técnica:* O script consome os dados do modo unificado `all` do script Bash, descobre o nome do provedor dinamicamente e faz o uso correto do parâmetro `mentioned` nativo da API para dar o ping sonoro nos administradores marcados no grupo.
 
 ---
@@ -133,7 +137,6 @@ Se você não souber o identifier único (`@g.us`) do grupo onde deseja receber 
 ```bash
 python3 extra/get_groups.py
 ```
-
 O script vai retornar uma tabela limpa e estruturada no seu terminal:
 
 ```
@@ -148,3 +151,4 @@ Grupo de Alertas - Provedor         | 558194669193-1588514048@g.us
 
 Todas as informações estatísticas são construidas diretamente do painel global do:
 * [APNIC Labs - IPv6 Capability Metrics](https://stats.labs.apnic.net/ipv6)
+░▒▓    ~                                                                                                               ✔  with joca@grafana  at 12:26:56  ▓▒░
