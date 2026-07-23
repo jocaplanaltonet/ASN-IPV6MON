@@ -185,7 +185,7 @@ Grupo de Alertas - Provedor          | 558194669193-1234567890@g.us
 
 ## 📜 Histórico de Alterações (Changelog)
 
-### v2.0 - Consolidação de Métricas e Unificação de Diretórios
+### v3.0 - Consolidação de Métricas e Unificação de Diretórios
 
 * **Novo Nome do Script (`asn_metrics.sh`)**: Atualizado a partir de `ipv6.sh` para refletir a adição das métricas de resiliência BGP.
 * **Ambiente Isolado `/opt/qrator/`**:
