@@ -1,5 +1,3 @@
-░▒▓    ~  nano cat                                                                                                     ✔  with joca@grafana  at 12:26:47  ▓▒░
-░▒▓    ~  cat README.md                                                                                                ✔  with joca@grafana  at 12:26:51  ▓▒░
 # ASN-IPV6MON V2 📊🌐
 Este projeto automatiza a coleta, o monitoramento temporal e a notificação de métricas de transição IPv6 (Capacidade e Preferência) para Sistemas Autônomos (ASN), utilizando dados oficiais consolidados em tempo real do **APNIC Labs**.
 
@@ -151,4 +149,3 @@ Grupo de Alertas - Provedor         | 558194669193-1588514048@g.us
 
 Todas as informações estatísticas são construidas diretamente do painel global do:
 * [APNIC Labs - IPv6 Capability Metrics](https://stats.labs.apnic.net/ipv6)
-░▒▓    ~                                                                                                               ✔  with joca@grafana  at 12:26:56  ▓▒░
