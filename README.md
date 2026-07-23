@@ -1,151 +1,204 @@
-# ASN-IPV6MON V2 📊🌐
-Este projeto automatiza a coleta, o monitoramento temporal e a notificação de métricas de transição IPv6 (Capacidade e Preferência) para Sistemas Autônomos (ASN), utilizando dados oficiais consolidados em tempo real do **APNIC Labs**.
+# ASN-IPV6MON & Qrator Radar V3 📊🌐
 
-A solução conta com monitoramento nativo via **Zabbix (External Check)** usando um script leve em Bash, dashboards analíticos no **Grafana** e relatórios diários inteligentes enviados com comparativo de variação percentual para o **WhatsApp**.
+Este projeto automatiza a coleta, o monitoramento temporal e a notificação de métricas de transição IPv6 (Capacidade e Preferência) e resiliência de roteamento BGP (**Rankings IPv4 e IPv6 do Qrator Radar**) para Sistemas Autônomos (ASN).
 
----
+A solução conta com monitoramento nativo via **Zabbix (External Check)** usando um script leve em Bash/Python, dashboards analíticos no **Grafana** e relatórios diários inteligentes com alertas comparativos enviados para o **WhatsApp** via **WPPConnect**.
 
 ## 🛑 Pré-requisitos & Dependências Globais
 
-Para que todo o ecossistema funcione (especialmente os alertas diários e os gráficos), a sua infraestrutura precisa contar com:
+Para que todo o ecossistema funcione (especialmente os alertas diários e os gráficos):
 
 1. **WPPConnect-Server Ativo:** É obrigatório ter o servidor do WPPConnect rodando (localmente ou em VPS) para intermediar o envio das mensagens e marcações no WhatsApp.
    * 🔗 **Repositório Oficial:** https://github.com/wppconnect-team/wppconnect-server
+
 2. **Sessão Iniciada:** Uma sessão válida e conectada via QR Code no WPPConnect-Server para disparar os alertas.
+
 3. **Zabbix Server 7.0+** com o plugin `alexanderzobnin-zabbix-datasource` ativo e configurado no Grafana.
 
----
+4. **Python 3 com Venv & Playwright:** Utilizado para consultar o Qrator Radar sem bloquear a execução do Zabbix.
 
-## 📂 Estrutura do Repositório
+## 📁 Estrutura do Repositório e Ambiente Global (`/opt/qrator/`)
+
+Para garantir que a biblioteca Playwright e o navegador Chromium fiquem isolados, com alta performance (execução em 1~2s) e acesso garantido para qualquer usuário (incluindo o usuário `zabbix`), o projeto centraliza seu ambiente em `/opt/qrator/`:
+
+```
+/opt/qrator/
+├── venv/            # Ambiente virtual Python isolado
+└── browser_cache/   # Cache e binários do Chromium (Playwright)
+```
+
+## 📂 Estrutura de Arquivos do Repositório
+
 ```
 ASN-IPV6MON
 ├── extra
 │   └── get_groups.py           # Script auxiliar para capturar o ID (JID) dos grupos do WhatsApp
 ├── grafana
-│   └── ASN-IPV6MONv2.json      # Código JSON do painel para o Grafana v13+
+│   └── ASN-IPV6MONv3.json      # Código JSON do painel para o Grafana v13+
 ├── README.md                   # Este manual de instruções
 ├── scripts
-│   ├── ipv6.sh                 # Script Bash integrado ao Zabbix External Check (tempo real)
-│   └── notificar_ipv6.py       # Consome o ipv6.sh, gerencia o histórico e envia alertas ao WhatsApp
+│   ├── asn_metrics.sh          # Script Bash integrado ao Zabbix External Check (tempo real)
+│   ├── notificar_ipv6.py       # Consome asn_metrics.sh, gerencia histórico e envia alertas no WhatsApp
+│   └── radarsetup.sh           # Script de setup para criar e preparar /opt/qrator/
 └── templates
-    └── ASN-IPV6MONv2.yaml      # Template atualizado para importação no Zabbix
+    └── ASN-IPV6MONv3.yaml      # Template atualizado para importação no Zabbix
 ```
 
----
+## 🛠️ 1. Instalação do Ambiente Global (`scripts/radarsetup.sh`)
 
-## 🛠️ 1. Configuração dos Scripts no Servidor
-
-### Passo 1: Instalar dependências do sistema
-Certifique-se de instalar os pacotes necessários no Linux para o correto funcionamento dos comandos de manipulação de texto e requisições no Bash (`curl` e `awk`):
+Execute o script de instalação uma única vez como `root` ou `sudo` no servidor Zabbix para preparar o diretório `/opt/qrator/`:
 
 ```bash
-sudo apt update
-sudo apt install curl awk -y
+chmod +x scripts/radarsetup.sh
+sudo ./scripts/radarsetup.sh
 ```
 
-### Passo 2: Organizar os scripts e aplicar permissões
-O script `ipv6.sh` **precisa obrigatoriamente** ficar localizado na pasta de checagens externas do seu Zabbix Server (`externalscripts`). O de notificação pode ficar na pasta de sua preferência.
+Conteúdo de referência do `scripts/radarsetup.sh`:
 
 ```bash
-# Dar permissão de execução nos scripts locais
-chmod +x scripts/notificar_ipv6.py
-chmod +x extra/get_groups.py
+#!/bin/bash
 
-# Copiar o script Bash para o diretório correto do Zabbix
-sudo cp scripts/ipv6.sh /usr/lib/zabbix/externalscripts/
-sudo chmod +x /usr/lib/zabbix/externalscripts/ipv6.sh
-sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/ipv6.sh
+# 1. Criar o diretório base
+mkdir -p /opt/qrator
+
+# 2. Criar o ambiente virtual isolado
+python3 -m venv /opt/qrator/venv
+
+# 3. Definir o caminho de cache do Chromium dentro do diretório do Qrator
+export PLAYWRIGHT_BROWSERS_PATH="/opt/qrator/browser_cache"
+
+# 4. Instalar as dependências e o Chromium
+/opt/qrator/venv/bin/pip install --upgrade pip
+/opt/qrator/venv/bin/pip install playwright
+/opt/qrator/venv/bin/python3 -m playwright install chromium
+
+# 5. Conceder acesso de execução a todos os usuários (incluindo o zabbix)
+chmod -R 755 /opt/qrator
+
+echo "✅ Instalação em /opt/qrator concluída com sucesso!"
 ```
 
-### Passo 3: Configurar a Automação do Agendamento (Cron)
-Como o script aceita o ASN de forma dinâmica por argumento, você deve passar o número do seu ASN desejado no final da chamada de execução:
+## ⚙️ 2. Configuração do Script Principal (`asn_metrics.sh`)
+
+Copie o script `asn_metrics.sh` para o diretório de scripts externos do Zabbix (`/usr/lib/zabbix/externalscripts/`):
 
 ```bash
-30 08 * * * /usr/bin/python3 /path-to-script/notificar_ipv6.py 52913
+sudo cp scripts/asn_metrics.sh /usr/lib/zabbix/externalscripts/
+sudo chmod +x /usr/lib/zabbix/externalscripts/asn_metrics.sh
+sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/asn_metrics.sh
 ```
 
-💡 *Nota sobre permissões:* O histórico de comparação de variação é salvo automaticamente na pasta `/tmp` com o sufixo do ID do usuário do Linux que o executou (`/tmp/historico_ipv6_{ASN}_{UID}.json`) com permissão liberada (`0o666`), garantindo que tanto o usuário `zabbix` quanto o usuário do `cron` possam ler e gravar dados sem conflitos de privilégio (`Permission denied`).
+### Sintaxe de Teste via Terminal:
 
----
-
-## 🌐 2. Como Adaptar para Outros Países (Internacionalización)
-
-Por padrão, este ecossistema vem configurado para coletar e monitorar dados de ASNs do **Brasil (BR)**.
-
-Se você precisar monitorar um ASN de outro país, basta abrir o arquivo `/usr/lib/zabbix/externalscripts/ipv6.sh` e alterar o código da região na variável localizada logo no início do código:
+`asn_metrics.sh <NÚMERO_DO_ASN> <MÉTRICA>`
 
 ```bash
-# Altere para a sigla ISO desejada (Ex: AR para Argentina, US para Estados Unidos, PT para Portugal)
-COUNTRY="BR"
+# Consultar nome do ASN
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 asname
+
+# Consultar numero do ASN
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 asnum
+
+# Consultar posição no Ranking Qrator IPv4
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 qrator_v4
+
+# Consultar posição no Ranking Qrator IPv6
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 qrator_v6
+
+# Consultar capacidade IPv6 (%)
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 capable
+
+# Consultar preferência IPv6 (%)
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 preferred
+
+# Retornar JSON completo
+/usr/lib/zabbix/externalscripts/asn_metrics.sh 52913 all
 ```
 
-💡 *Dica:* Para consultar as siglas oficiais de cada região aceitas pela API, acesse a tabela global direto na fonte: [APNIC Labs ISO Country Codes](https://stats.labs.apnic.net/ipv6)
-
----
-
-## 📐 3. Integração com o Zabbix
+## 📐 3. Configuração dos Itens no Zabbix
 
 1. Acesse o painel web do seu Zabbix Server.
-2. Vá em **Data collection** -> **Templates** -> **Import** e selecione o arquivo `templates/ASN-IPV6MONv2.yaml`.
+2. Vá em **Data collection** -> **Templates** -> **Import** e selecione o arquivo `templates/ASN-IPV6MONv3.yaml`.
 3. Associe o template ao Host de monitoramento desejado.
-4. **Configuração Obrigatória da Macro:** Vá na aba **Macros** do seu Host e preencha o valor da macro `{$ASN_NUM}` com o número do seu ASN (exemplo: `52913`). Sem isso, o Zabbix não saberá qual operadora monitorar.
-5. Os parâmetros posicionais aceitos nativamente pelo `ipv6.sh` são:
-   * `ipv6.sh[{#ASN},asnum]` -> Retorna o número do ASN.
-   * `ipv6.sh[{#ASN},asname]` -> Retorna o Nome Fantasia oficial da Organização no APNIC.
-   * `ipv6.sh[{#ASN},capable]` -> Retorna a porcentagem de Capacidade IPv6.
-   * `ipv6.sh[{#ASN},preferred]` -> Retorna a porcentagem de Preferência IPv6.
+4. **Configuração Obrigatória da Macro:** Na aba **Macros** do Host ou Template, configure:
+   * **Macro:** `{$ASN_NUM}`
+   * **Valor:** `52913` (ou o ASN da sua rede)
 
----
+### Tabela de Itens Padronizados:
 
-## 📉 4. Importação do Dashboard no Grafana
+| Nome do Item | Tipo | Chave (Key) | Unidade | Intervalo |
+| :--- | :--- | :--- | :--- | :--- |
+| 🆔 **Número do ASN: {$ASN_NUM}** | External Check | `asn_metrics.sh["{$ASN_NUM}","asnum"]` | - | 1d |
+| 🏢 **Provedor: AS{$ASN_NUM}** | External Check | `asn_metrics.sh["{$ASN_NUM}","asname"]` | - | 1d |
+| 🌐 **Capacidade IPv6: AS{$ASN_NUM}** | External Check | `asn_metrics.sh["{$ASN_NUM}","capable"]` | % | 1h |
+| 🚀 **Preferência IPv6: AS{$ASN_NUM}** | External Check | `asn_metrics.sh["{$ASN_NUM}","preferred"]` | % | 1h |
+| 🛡️ **Ranking Qrator IPv4: AS{$ASN_NUM}** | External Check | `asn_metrics.sh["{$ASN_NUM}","qrator_v4"]` | º | 6h |
+| 🛡️ **Ranking Qrator IPv6: AS{$ASN_NUM}** | External Check | `asn_metrics.sh["{$ASN_NUM}","qrator_v6"]` | º | 6h |
 
-1. No menu lateral do Grafana, clique em **Dashboards** -> **New** -> **Import**.
-2. Cole o conteúdo do arquivo `grafana/ASN-IPV6MONv2.json` ou clique em *Upload JSON file*.
-3. Na janela de importação, selecione o seu Data Source do Zabbix correspondente.
-4. Clique em **Import**.
+## 💬 4. Notificações Diárias no WhatsApp (`notificar_ipv6.py`)
 
-⚠️ **Ajuste das Variáveis de Topo (Obrigatório):**
-Logo após importar, você verá os seletores no topo da tela. Ajuste os seguintes campos para sincronizar os dados:
-* **Host no Zabbix (`$VISIBLE_NAME`):** Altere essa variável de texto para o nome exato (Visible hostname) que você cadastrou no seu Zabbix (Ex: `IPV6MON-52913`).
-* **Número do ASN (`$ASN_NUM`):** Este campo puxará automaticamente o ASN que você configurou na macro `{$ASN_NUM}` dentro do Zabbix no passo anterior.
+O script `notificar_ipv6.py` executa o `asn_metrics.sh <ASN> all`, compara os valores com o arquivo de histórico mantido em `/tmp/historico_ipv6_{ASN}_{UID}.json` e envia o relatório formatado para o seu grupo de WhatsApp.
 
----
+### Configuração no script:
 
-## 💬 5. Configuração das Notificações do WhatsApp
-
-Abra o arquivo `scripts/notificar_ipv6.py` e configure os parâmetros de produção da sua API WPPConnect-Server:
+Edite as credenciais no início de `scripts/notificar_ipv6.py`:
 
 ```python
-# Configurações da API WhatsApp (Seus dados reais de Produção)
 WPP_URL = "http://127.0.0.1:21465/api/SUA_SESSAO/send-mentioned"
 TOKEN = "SEU_TOKEN_AQUI"
-
-# Configurações de Destino no Grupo
 TARGET_GROUP = "ID_DO_GRUPO@g.us"
 NUMEROS_PARA_MENCIONAR = ["558187654321"]
 ```
-💡 *Nota técnica:* O script consome os dados do modo unificado `all` do script Bash, descobre o nome do provedor dinamicamente e faz o uso correto do parâmetro `mentioned` nativo da API para dar o ping sonoro nos administradores marcados no grupo.
 
----
+### Agendamento no Cron:
 
-## 🔍 6. Como descobrir o ID (JID) do seu Grupo do WhatsApp
+Configure a chamada diária no `crontab -e`:
 
-Se você não souber o identifier único (`@g.us`) do grupo onde deseja receber os alertas diários, configure os parâmetros de sessão no arquivo `extra/get_groups.py` e execute:
+```bash
+30 08 * * * /usr/bin/python3 /usr/lib/zabbix/externalscripts/notificar_ipv6.py 52913
+```
+
+## 🔍 5. Descobrir o ID (JID) do Grupo no WhatsApp
+
+Execute o script utilitário para listar os IDs de todos os grupos ativos na sua sessão do WPPConnect:
 
 ```bash
 python3 extra/get_groups.py
 ```
-O script vai retornar uma tabela limpa e estruturada no seu terminal:
+
+Saída no terminal:
 
 ```
-NOME DO GRUPO                       | ID (JID)
+NOME DO GRUPO                         | ID (JID)
 ---------------------------------------------------------------------------
-Grupo de Alertas - Provedor         | 558194669193-1588514048@g.us
+Grupo de Alertas - Provedor          | 558194669193-1234567890@g.us
 ```
 
----
+## 📉 6. Importação do Dashboard no Grafana
 
-## 🔗 Fonte dos Dados
+1. No menu lateral do Grafana, clique em **Dashboards** -> **New** -> **Import**.
+2. Cole o conteúdo do arquivo `grafana/ASN-IPV6MONv2.json` ou faça upload do arquivo JSON.
+3. Selecione o seu Data Source do Zabbix correspondente.
+4. Ajuste as variáveis no topo do painel:
+   * **`$VISIBLE_NAME`**: Nome do Host cadastrado no Zabbix.
+   * **`$ASN_NUM`**: Número do ASN monitorado.
 
-Todas as informações estatísticas são construidas diretamente do painel global do:
-* [APNIC Labs - IPv6 Capability Metrics](https://stats.labs.apnic.net/ipv6)
+## 📜 Histórico de Alterações (Changelog)
+
+### v2.0 - Consolidação de Métricas e Unificação de Diretórios
+
+* **Novo Nome do Script (`asn_metrics.sh`)**: Atualizado a partir de `ipv6.sh` para refletir a adição das métricas de resiliência BGP.
+* **Ambiente Isolado `/opt/qrator/`**:
+  * Unificação do ambiente virtual Python (`/opt/qrator/venv`) e do cache Chromium (`/opt/qrator/browser_cache`).
+  * Inclusão do script de automação `scripts/radarsetup.sh`.
+* **Métricas do Qrator Radar no WhatsApp**:
+  * Inclusão dos dados dos rankings IPv4 e IPv6 no relatório diário.
+  * Comparativo dinâmico de tendência (interpretação invertida para rankings: posição menor = melhoria 📈).
+* **Otimizações de Desempenho**:
+  * Implementação de *Lazy Loading* em `asn_metrics.sh` (requisições isoladas só consultam a fonte correspondente).
+  * Tratamento de ordinais em inglês para ranking (`1st`, `2nd`, `3rd`, `4th`).
+
+## 🔗 Fontes dos Dados
+
+* **APNIC Labs (Métricas IPv6):** https://stats.labs.apnic.net/ipv6
+* **Qrator Radar (Resiliência BGP):** https://radar.qrator.net/
