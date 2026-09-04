@@ -16,20 +16,20 @@ ASNAME="Unknown"
 
 get_apnic_data() {
     [ $APNIC_LOADED -eq 1 ] && return
-    
-    URL_APNIC="https://stats.labs.apnic.net/ipv6/AS${ASN}?c=${COUNTRY}&p=1&v=1&w=30&x=1"
-    LINHA_HTML=$(curl -s -k -L -m 10 -H "User-Agent: Mozilla/5.0" "$URL_APNIC" | grep "/AS${ASN}" | head -n 1)
+
+    URL_APNIC="https://stats.labs.apnic.net/ipv6/${COUNTRY}"
+    LINHA_HTML=$(curl -s -k -L -m 15 -A "Mozilla/5.0 (X11; Linux x86_64)" "$URL_APNIC" | grep -i "AS${ASN}" | head -n 1)
 
     if [ -n "$LINHA_HTML" ]; then
-        CAPABLE=$(echo "$LINHA_HTML" | awk -F '{v: ' '{print $2}' | cut -d',' -f1 | tr -d ' ')
-        PREFERRED=$(echo "$LINHA_HTML" | awk -F '{v: ' '{print $3}' | cut -d',' -f1 | tr -d ' ')
-        ASNAME=$(echo "$LINHA_HTML" | awk -F "\",\"AS${ASN} - " '{print $2}' | cut -d'"' -f1)
+        ASNAME=$(echo "$LINHA_HTML" | sed -E 's/.*"AS[0-9]+ - ([^"]+)".*/\1/')
+        CAPABLE=$(echo "$LINHA_HTML" | grep -oP 'v:\s*\K[0-9]+(\.[0-9]+)?' | head -n 1)
+        PREFERRED=$(echo "$LINHA_HTML" | grep -oP 'v:\s*\K[0-9]+(\.[0-9]+)?' | sed -n '2p')
     fi
 
     [ -z "$ASNAME" ] && ASNAME="Unknown"
     [ -z "$CAPABLE" ] && CAPABLE="0.00"
     [ -z "$PREFERRED" ] && PREFERRED="0.00"
-    
+
     APNIC_LOADED=1
 }
 
@@ -57,7 +57,6 @@ else:
         return
     fi
 
-    # Caminho unificado /opt/qrator
     VENV=""
     if [ -d "/opt/qrator/venv" ]; then
         VENV="/opt/qrator/venv"
@@ -85,7 +84,7 @@ try:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
         page = browser.new_page()
         page.goto(f'https://radar.qrator.net/as/{as_num}', wait_until='domcontentloaded', timeout=25000)
-        
+
         try:
             page.wait_for_function('() => /place in/i.test(document.body.innerText)', timeout=15000)
         except Exception:
